@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>App By Peace</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Use class-based dark mode
+    tailwind.config = { darkMode: 'class' };
+  </script>
+
+  <style>
+    /* small custom scrollbar for better UX */
+    ::-webkit-scrollbar { height: 8px; width: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 8px; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-black text-gray-900 dark:text-gray-100 min-h-screen antialiased">
+
+  <!-- App container -->
+  <div class="max-w-4xl mx-auto p-4 md:p-8">
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold">To-Do List Application</h1>
+        <p class="text-sm text-gray-600 dark:text-gray-300">Manage tasks — persistent with localStorage · Responsive · Accessible</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Dark mode toggle -->
+        <button id="darkToggle" aria-label="Toggle dark mode"
+          class="p-2 rounded-md bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-100 hover:opacity-90">
+          🌙
+        </button>
+
+        <!-- Clear completed -->
+        <button id="clearCompleted" title="Clear completed tasks"
+          class="px-3 py-1 rounded-md bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-sm hover:opacity-90">
+          Clear Completed
+        </button>
+      </div>
+    </header>
+
+    <!-- Add Task Card -->
+    <section class="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-lg shadow-sm mb-6">
+      <form id="taskForm" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <div class="md:col-span-2">
+          <label class="text-sm font-medium block mb-1">Task</label>
+          <input id="taskInput" type="text" placeholder="e.g., Finish assignment" required
+            class="w-full p-2 border rounded-md bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-400" />
+        </div>
+
+        <div class="flex gap-2 items-center">
+          <div class="w-32">
+            <label class="text-sm font-medium block mb-1">Priority</label>
+            <select id="prioritySelect" class="w-full p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div class="w-40">
+            <label class="text-sm font-medium block mb-1">Category</label>
+            <input id="categoryInput" type="text" placeholder="Work / Personal" class="w-full p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700" />
+          </div>
+
+          <button type="submit" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-md font-semibold">Add</button>
+        </div>
+      </form>
+
+      <!-- Small controls: search & filters -->
+      <div class="mt-4 flex flex-wrap gap-3 items-center">
+        <input id="searchInput" placeholder="Search tasks..." class="p-2 border rounded-md w-full md:w-1/2 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700" />
+        <select id="filterStatus" class="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+        </select>
+        <select id="filterPriority" class="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+          <option value="all">Any Priority</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+          <option value="low">Low</option>
+        </select>
+
+        <select id="filterCategory" class="p-2 border rounded-md bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+          <option value="all">All Categories</option>
+        </select>
+
+        <button id="exportBtn" title="Export tasks JSON" class="px-3 py-1 rounded-md bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Export</button>
+        <label for="importFile" class="px-3 py-1 rounded-md bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 cursor-pointer">Import</label>
+        <input id="importFile" type="file" accept=".json" class="hidden" />
+      </div>
+    </section>
+
+    <!-- Tasks list -->
+    <section id="tasksSection" class="space-y-3">
+      <!-- tasks rendered here -->
+    </section>
+
+    <!-- Footer / stats -->
+    <footer class="mt-6 text-sm text-gray-600 dark:text-gray-400">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+        <div id="stats">0 tasks • 0 active • 0 completed</div>
+        <div class="text-xs">Press <kbd class="px-1 bg-gray-100 dark:bg-gray-800 rounded">Enter</kbd> to add quickly. Double-click a task to edit.</div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Template for a task (not displayed directly) -->
+  <template id="taskTemplate">
+    <article class="task-item bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm flex items-start gap-3">
+      <input type="checkbox" class="task-checkbox mt-1" aria-label="Mark complete" />
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <div class="task-text truncate text-sm"></div>
+          <div class="flex items-center gap-2">
+            <span class="task-priority text-xs px-2 py-0.5 rounded-full"></span>
+            <button class="edit-btn p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Edit">✏️</button>
+            <button class="delete-btn p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Delete">🗑️</button>
+          </div>
+        </div>
+        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
+          <div class="task-category"></div>
+          <div class="task-time"></div>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <!-- Script: application logic -->
+  <script>
+    // -------------------------
+    // Data model & localStorage
+    // -------------------------
+    const STORAGE_KEY = 'peace_todo_tasks_v1';
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+    }
+
+    // load tasks
+    function loadTasks() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        console.error('Failed to parse tasks from storage', e);
+        return [];
+      }
+    }
+
+    function saveTasks(tasks) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    // -------------------------
+    // App state
+    // -------------------------
+    let tasks = loadTasks();
+
+    // UI elements
+    const taskForm = document.getElementById('taskForm');
+    const taskInput = document.getElementById('taskInput');
+    const categoryInput = document.getElementById('categoryInput');
+    const prioritySelect = document.getElementById('prioritySelect');
+    const tasksSection = document.getElementById('tasksSection');
+    const taskTemplate = document.getElementById('taskTemplate');
+    const statsEl = document.getElementById('stats');
+    const darkToggle = document.getElementById('darkToggle');
+    const clearCompletedBtn = document.getElementById('clearCompleted');
+    const searchInput = document.getElementById('searchInput');
+    const filterStatus = document.getElementById('filterStatus');
+    const filterPriority = document.getElementById('filterPriority');
+    const filterCategory = document.getElementById('filterCategory');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+
+    // -------------------------
+    // Helpers
+    // -------------------------
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleString();
+    }
+
+    function priorityLabel(priority) {
+      if (priority === 'high') return { text: 'HIGH', classes: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' };
+      if (priority === 'low') return { text: 'LOW', classes: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' };
+      return { text: 'NORMAL', classes: 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200' };
+    }
+
+    // Populate categories filter with existing categories
+    function refreshCategories() {
+      const categories = Array.from(new Set(tasks.map(t => (t.category || '').trim()).filter(Boolean)));
+      filterCategory.innerHTML = '<option value="all">All Categories</option>';
+      categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        filterCategory.appendChild(opt);
+      });
+    }
+
+    // -------------------------
+    // Render
+    // -------------------------
+    function renderTasks() {
+      tasksSection.innerHTML = ''; // clear
+
+      // apply filters
+      const query = (searchInput.value || '').toLowerCase().trim();
+      const status = filterStatus.value;
+      const pFilter = filterPriority.value;
+      const cFilter = filterCategory.value;
+
+      const visible = tasks.filter(t => {
+        if (status === 'active' && t.completed) return false;
+        if (status === 'completed' && !t.completed) return false;
+        if (pFilter !== 'all' && t.priority !== pFilter) return false;
+        if (cFilter !== 'all' && (t.category || '') !== cFilter) return false;
+        if (query && !(t.text.toLowerCase().includes(query) || (t.category || '').toLowerCase().includes(query))) return false;
+        return true;
+      });
+
+      visible.sort((a,b) => {
+        // prioritize high first, then not completed, then recent
+        const prioOrder = { high: 0, normal: 1, low: 2 };
+        if (prioOrder[a.priority] !== prioOrder[b.priority]) return prioOrder[a.priority] - prioOrder[b.priority];
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return b.createdAt - a.createdAt;
+      });
+
+      visible.forEach(t => {
+        const node = taskTemplate.content.firstElementChild.cloneNode(true);
+        const checkbox = node.querySelector('.task-checkbox');
+        const textEl = node.querySelector('.task-text');
+        const priorityEl = node.querySelector('.task-priority');
+        const deleteBtn = node.querySelector('.delete-btn');
+        const editBtn = node.querySelector('.edit-btn');
+        const categoryEl = node.querySelector('.task-category');
+        const timeEl = node.querySelector('.task-time');
+
+        checkbox.checked = !!t.completed;
+        if (t.completed) {
+          textEl.classList.add('line-through', 'opacity-70');
+        } else {
+          textEl.classList.remove('line-through', 'opacity-70');
+        }
+
+        textEl.textContent = t.text;
+        categoryEl.textContent = t.category ? `Category: ${t.category}` : '';
+        timeEl.textContent = formatTime(t.createdAt);
+
+        const p = priorityLabel(t.priority);
+        priorityEl.textContent = p.text;
+        priorityEl.className = 'task-priority text-xs px-2 py-0.5 rounded-full ' + p.classes;
+
+        // toggling complete
+        checkbox.addEventListener('change', () => {
+          t.completed = checkbox.checked;
+          saveTasks(tasks);
+          renderTasks();
+        });
+
+        // delete
+        deleteBtn.addEventListener('click', () => {
+          if (!confirm('Delete this task?')) return;
+          tasks = tasks.filter(x => x.id !== t.id);
+          saveTasks(tasks);
+          refreshCategories();
+          renderTasks();
+        });
+
+        // inline edit (double click or edit button)
+        function beginEdit() {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = t.text;
+          input.className = 'w-full p-2 rounded-md bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600';
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              finishEdit(input.value.trim());
+            } else if (e.key === 'Escape') {
+              renderTasks();
+            }
+          });
+          input.addEventListener('blur', () => finishEdit(input.value.trim()));
+          textEl.replaceWith(input);
+          input.focus();
+        }
+        function finishEdit(newVal) {
+          if (!newVal) {
+            alert('Task cannot be empty.');
+            renderTasks();
+            return;
+          }
+          t.text = newVal;
+          saveTasks(tasks);
+          renderTasks();
+        }
+        editBtn.addEventListener('click', beginEdit);
+        node.querySelector('.task-text').addEventListener('dblclick', beginEdit);
+
+        tasksSection.appendChild(node);
+      });
+
+      // stats
+      const total = tasks.length;
+      const completed = tasks.filter(t => t.completed).length;
+      const active = total - completed;
+      statsEl.textContent = `${total} tasks • ${active} active • ${completed} completed`;
+
+      refreshCategories();
+    }
+
+    // -------------------------
+    // Actions
+    // -------------------------
+    taskForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = taskInput.value.trim();
+      if (!text) return;
+      const category = (categoryInput.value || '').trim();
+      const priority = prioritySelect.value || 'normal';
+      const newTask = {
+        id: uid(),
+        text,
+        completed: false,
+        priority,
+        category,
+        createdAt: Date.now()
+      };
+      tasks.unshift(newTask);
+      saveTasks(tasks);
+      taskInput.value = '';
+      categoryInput.value = '';
+      prioritySelect.value = 'normal';
+      renderTasks();
+    });
+
+    // quick add with Enter when focus on body
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.activeElement === taskInput) {
+        // form will handle
+        return;
+      }
+    });
+
+    // clear completed
+    clearCompletedBtn.addEventListener('click', () => {
+      if (!confirm('Remove all completed tasks?')) return;
+      tasks = tasks.filter(t => !t.completed);
+      saveTasks(tasks);
+      renderTasks();
+    });
+
+    // search & filters
+    [searchInput, filterStatus, filterPriority, filterCategory].forEach(el => {
+      el.addEventListener('input', () => renderTasks());
+    });
+
+    // export/import
+    exportBtn.addEventListener('click', () => {
+      const data = JSON.stringify(tasks, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tasks-export.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    importFile.addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!Array.isArray(imported)) throw new Error('Invalid file');
+          // Merge carefully: ensure minimum fields
+          const mapped = imported.map(t => ({
+            id: t.id || uid(),
+            text: t.text || '',
+            completed: !!t.completed,
+            priority: t.priority || 'normal',
+            category: t.category || '',
+            createdAt: t.createdAt || Date.now()
+          }));
+          tasks = mapped.concat(tasks); // imported first
+          saveTasks(tasks);
+          renderTasks();
+          alert('Import successful');
+        } catch (err) {
+          alert('Failed to import: ' + err.message);
+        }
+      };
+      reader.readAsText(f);
+      e.target.value = ''; // reset
+    });
+
+    // -------------------------
+    // Dark mode persistence
+    // -------------------------
+    // Load saved theme or system
+    function initTheme() {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') document.documentElement.classList.add('dark');
+      else if (saved === 'light') document.documentElement.classList.remove('dark');
+      else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+      updateDarkBtn();
+    }
+    function toggleDark() {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateDarkBtn();
+    }
+    function updateDarkBtn() {
+      darkToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+    }
+    darkToggle.addEventListener('click', toggleDark);
+
+    // -------------------------
+    // Init app
+    // -------------------------
+    (function init() {
+      initTheme();
+      renderTasks();
+    })();
+  </script>
+</body>
+</html>
