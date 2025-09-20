@@ -1,0 +1,11 @@
+/* Smooth transition when switching dark mode */
+body {
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Completed task style */
+.completed {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
